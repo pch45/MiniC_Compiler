@@ -15,6 +15,7 @@ public class UcodeGenVisitor implements ASTVisitor{
 	int local_decl = 1;
 	int label_num = 0;
 	boolean has_return = false;
+	int expression_depth = 1;
 
 	HashMap<String, String> var_code = new HashMap<String,String>();
 	HashMap<String, String> local_var_code = new HashMap<String,String>();
@@ -166,6 +167,7 @@ public class UcodeGenVisitor implements ASTVisitor{
 	public void visitExpression(Expression node) {
 		// TODO Auto-generated method stub
 		boolean isparam = false;
+		expression_depth++;
 		if(node instanceof ArefAssignNode) {
 			ArefAssignNode t = (ArefAssignNode) node;
 			for(int i = 0 ; i < params.size(); i++) {
@@ -257,6 +259,7 @@ public class UcodeGenVisitor implements ASTVisitor{
 		}
 
 		else if(node instanceof ParenExpression) {
+			expression_depth--;
 			ParenExpression t = (ParenExpression) node;
 			visitExpression(t.expr);
 		}
@@ -291,6 +294,8 @@ public class UcodeGenVisitor implements ASTVisitor{
 		else if(node instanceof UnaryOpNode) {
 			UnaryOpNode t = (UnaryOpNode) node;
 			String code = null;
+			boolean only_unary = false;
+			if(expression_depth == 2) only_unary = true;
 
 			if(!(t.expr instanceof ArefNode)) {
 				if(local_var_code.containsKey(t.expr.toString()))
@@ -302,9 +307,12 @@ public class UcodeGenVisitor implements ASTVisitor{
 				if((op = unary_opcode(t.op)) != null) {
 					System.out.println("           "+op);
 				}
-				if(code != null)
+				if(code != null) {
 					System.out.println("           str        "+code.charAt(0)+" "+ code.substring(1));
-				
+					if(!only_unary) {
+						System.out.println("           lod        "+code.charAt(0)+" "+ code.substring(1));
+					}
+				}
 			}
 
 			else if(t.expr instanceof ArefNode) {
@@ -325,30 +333,26 @@ public class UcodeGenVisitor implements ASTVisitor{
 						code = var_code.get(aref.t_node.toString());
 					visitExpression(aref.expr);
 					System.out.println("           lda        "+code.charAt(0)+" "+code.substring(1));
-					System.out.println("           add");
-					if((op = unary_opcode(t.op)) != null) {
-						visitExpression(t.expr);
-						System.out.println("           "+op);
-						System.out.println("           sti");
-					}
-					else {
-						System.out.println("           ldi");
-					}
 				}
 
 				else {
 					code = local_var_code.get(aref.t_node.toString());
 					visitExpression(aref.expr);
 					System.out.println("           lod        "+code.charAt(0)+" "+code.substring(1));
-					System.out.println("           add");
-					if((op = unary_opcode(t.op)) != null) {
-						visitExpression(t.expr);
-						System.out.println("           "+op);
-						System.out.println("           sti");
-					}
-					else {
+				}
+				
+				
+				System.out.println("           add");
+				if((op = unary_opcode(t.op)) != null) {
+					visitExpression(t.expr);
+					System.out.println("           "+op);
+					System.out.println("           sti");
+					if(!only_unary) {
 						System.out.println("           ldi");
 					}
+				}
+				else {
+					System.out.println("           ldi");
 				}
 			}
 		}
@@ -382,6 +386,7 @@ public class UcodeGenVisitor implements ASTVisitor{
 	@Override
 	public void visitStatement(Statement node) {
 		// TODO Auto-generated method stub
+		expression_depth = 1;
 		if(node instanceof Compound_Statement) {
 			Compound_Statement t = (Compound_Statement) node;
 			int j = 0;
